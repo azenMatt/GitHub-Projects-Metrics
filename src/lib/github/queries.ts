@@ -126,3 +126,26 @@ query($issueId: ID!, $cursor: String) {
     }
   }
 }`;
+
+export const STATUS_TIMELINE_QUERY = `
+query($issueId: ID!, $projectId: ID!, $cursor: String) {
+  node(id: $issueId) {
+    ... on Issue {
+      timelineItems(
+        first: 100
+        after: $cursor
+        itemTypes: [PROJECT_V2_ITEM_STATUS_CHANGED_EVENT]
+      ) {
+        pageInfo { hasNextPage endCursor }
+        nodes {
+          ... on ProjectV2ItemStatusChangedEvent {
+            createdAt
+            previousStatus
+            status
+            project { id }
+          }
+        }
+      }
+    }
+  }
+}`;

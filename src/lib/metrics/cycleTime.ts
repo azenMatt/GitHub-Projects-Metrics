@@ -1,4 +1,4 @@
-import { ProjectData } from "../github/types";
+import { ProjectData, StatusTransitionMap } from "../github/types";
 
 export interface CycleTimeItem {
   title: string;
@@ -10,10 +10,24 @@ export interface CycleTimeItem {
   endDate: string;
 }
 
+export interface CycleTimeOptions {
+  startAt?: "created" | string;
+  transitionMap?: StatusTransitionMap;
+}
+
 /**
- * Compute cycle time per item as createdAt → closedAt.
+ * Compute cycle time per item.
+ *
+ * When startAt is "created" (default), uses createdAt → closedAt.
+ * When startAt is a status name, uses the first timestamp the item entered
+ * that status (from transitionMap) → closedAt. Items without a matching
+ * transition are excluded.
  */
-export function computeCycleTime(data: ProjectData): CycleTimeItem[] {
+export function computeCycleTime(
+  data: ProjectData,
+  options: CycleTimeOptions = {}
+): CycleTimeItem[] {
+  const { startAt = "created", transitionMap } = options;
   const results: CycleTimeItem[] = [];
 
   for (const item of data.items) {
@@ -24,7 +38,18 @@ export function computeCycleTime(data: ProjectData): CycleTimeItem[] {
     const issueType =
       item.content.__typename === "Issue" ? item.content.issueType ?? null : null;
 
-    const startDate = new Date(item.content.createdAt).getTime();
+    let startDateStr: string;
+    if (startAt === "created") {
+      startDateStr = item.content.createdAt;
+    } else {
+      // Look up when this item first entered the selected status
+      const transitions = transitionMap?.get(item.content.id);
+      const ts = transitions?.get(startAt);
+      if (!ts) continue; // no transition found — skip item
+      startDateStr = ts;
+    }
+
+    const startDate = new Date(startDateStr).getTime();
     const endDate = new Date(item.content.closedAt).getTime();
     const cycleDays = Math.round(((endDate - startDate) / (1000 * 60 * 60 * 24)) * 10) / 10;
 
@@ -34,7 +59,7 @@ export function computeCycleTime(data: ProjectData): CycleTimeItem[] {
       url: item.content.url,
       issueType,
       cycleDays: Math.max(0, cycleDays),
-      startDate: item.content.createdAt,
+      startDate: startDateStr,
       endDate: item.content.closedAt,
     });
   }

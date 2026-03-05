@@ -4,6 +4,7 @@ import {
   PROJECT_QUERY_USER,
   ITEMS_QUERY,
   SUB_ISSUES_QUERY,
+  STATUS_TIMELINE_QUERY,
 } from "./queries";
 import {
   ProjectData,
@@ -14,6 +15,7 @@ import {
   DraftContent,
   HierarchyNode,
   HierarchyProgress,
+  StatusTransitionMap,
 } from "./types";
 
 const GITHUB_GRAPHQL = "https://api.github.com/graphql";
@@ -294,4 +296,66 @@ export async function fetchInitiativeHierarchy(
   }
 
   return roots;
+}
+
+/**
+ * Fetch status transition timestamps for closed issues in a project.
+ * Returns a map: issueNodeId → statusName → first ISO timestamp the item entered that status.
+ */
+export async function fetchStatusTransitions(
+  token: string,
+  projectData: ProjectData
+): Promise<StatusTransitionMap> {
+  const transitionMap: StatusTransitionMap = new Map();
+  const projectId = projectData.id;
+
+  // Collect closed issue IDs
+  const issueIds: string[] = [];
+  for (const item of projectData.items) {
+    if (
+      item.content &&
+      item.content.__typename === "Issue" &&
+      item.content.closedAt
+    ) {
+      issueIds.push(item.content.id);
+    }
+  }
+
+  // Fetch timeline events for each issue
+  for (const issueId of issueIds) {
+    let cursor: string | null = null;
+    let hasNextPage = true;
+    const statusTimestamps = new Map<string, string>();
+
+    while (hasNextPage) {
+      const res = await graphql(token, STATUS_TIMELINE_QUERY, {
+        issueId,
+        projectId,
+        cursor,
+      });
+
+      const timeline = res.data?.node?.timelineItems;
+      if (!timeline) break;
+
+      for (const event of timeline.nodes) {
+        if (!event || !event.status) continue;
+        // Only include events from this project
+        if (event.project?.id !== projectId) continue;
+        const status = event.status as string;
+        // Keep the earliest timestamp for each status
+        if (!statusTimestamps.has(status)) {
+          statusTimestamps.set(status, event.createdAt);
+        }
+      }
+
+      hasNextPage = timeline.pageInfo.hasNextPage;
+      cursor = timeline.pageInfo.endCursor;
+    }
+
+    if (statusTimestamps.size > 0) {
+      transitionMap.set(issueId, statusTimestamps);
+    }
+  }
+
+  return transitionMap;
 }

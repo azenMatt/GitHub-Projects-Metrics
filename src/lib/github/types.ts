@@ -63,6 +63,9 @@ export interface DraftContent {
 
 export type ItemContent = IssueContent | PullRequestContent | DraftContent;
 
+/** Maps issue node ID → status name → ISO timestamp of first entry into that status. */
+export type StatusTransitionMap = Map<string, Map<string, string>>;
+
 export interface HierarchyProgress {
   done: number;
   inProgress: number;
