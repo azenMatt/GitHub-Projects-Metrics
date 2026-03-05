@@ -4,6 +4,7 @@ export interface CycleTimeItem {
   title: string;
   number: number | null;
   url: string | null;
+  issueType: string | null;
   cycleDays: number;
   startDate: string;
   endDate: string;
@@ -20,6 +21,9 @@ export function computeCycleTime(data: ProjectData): CycleTimeItem[] {
     if (item.content.__typename === "DraftIssue") continue;
     if (!item.content.closedAt) continue;
 
+    const issueType =
+      item.content.__typename === "Issue" ? item.content.issueType ?? null : null;
+
     const startDate = new Date(item.content.createdAt).getTime();
     const endDate = new Date(item.content.closedAt).getTime();
     const cycleDays = Math.round(((endDate - startDate) / (1000 * 60 * 60 * 24)) * 10) / 10;
@@ -28,6 +32,7 @@ export function computeCycleTime(data: ProjectData): CycleTimeItem[] {
       title: item.content.title,
       number: item.content.number,
       url: item.content.url,
+      issueType,
       cycleDays: Math.max(0, cycleDays),
       startDate: item.content.createdAt,
       endDate: item.content.closedAt,
@@ -39,6 +44,15 @@ export function computeCycleTime(data: ProjectData): CycleTimeItem[] {
   );
 
   return results;
+}
+
+/** Get the distinct set of issue types present in the data. */
+export function getIssueTypes(items: CycleTimeItem[]): string[] {
+  const types = new Set<string>();
+  for (const item of items) {
+    types.add(item.issueType ?? "None");
+  }
+  return [...types].sort();
 }
 
 export function computeCycleTimeStats(items: CycleTimeItem[]) {

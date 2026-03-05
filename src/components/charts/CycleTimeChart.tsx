@@ -80,6 +80,7 @@ export default function CycleTimeChart({ data, stats }: Props) {
           y: d.cycleDays,
           name: d.title,
           url: d.url,
+          issueType: d.issueType,
           startDate: d.startDate,
           endDate: d.endDate,
         })),
@@ -94,6 +95,7 @@ export default function CycleTimeChart({ data, stats }: Props) {
               return d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
             };
             return `<b>${p.name}</b><br/>` +
+              (p.issueType ? `Type: ${p.issueType}<br/>` : "") +
               `Created: ${fmtDate(p.startDate)}<br/>` +
               `Closed: ${fmtDate(p.endDate)}<br/>` +
               `Cycle time: <b>${p.y} days</b><br/>` +
