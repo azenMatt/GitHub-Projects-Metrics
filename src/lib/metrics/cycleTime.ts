@@ -1,4 +1,4 @@
-import { ProjectData, ProjectItem } from "../github/types";
+import { ProjectData } from "../github/types";
 
 export interface CycleTimeItem {
   title: string;
@@ -9,55 +9,28 @@ export interface CycleTimeItem {
   endDate: string;
 }
 
-export interface CycleTimeOptions {
-  startAt: "created" | string;  // "created" or a status name
-  endAt: "closed" | string;     // "closed" or a status name
-  statusOrder: string[];        // ordered list of statuses from project
-}
-
 /**
- * Compute cycle time per item.
- *
- * Start: "created" uses createdAt. A status name filters to items that have
- * reached at least that status (based on statusOptions order).
- *
- * End: "closed" uses closedAt. A status name filters to items currently in
- * that status (or later) and uses closedAt if available, otherwise updatedAt.
+ * Compute cycle time per item as createdAt → closedAt.
  */
-export function computeCycleTime(
-  data: ProjectData,
-  options: CycleTimeOptions = { startAt: "created", endAt: "closed", statusOrder: [] }
-): CycleTimeItem[] {
+export function computeCycleTime(data: ProjectData): CycleTimeItem[] {
   const results: CycleTimeItem[] = [];
-  const { startAt, endAt, statusOrder } = options;
-
-  const statusIndex = new Map(statusOrder.map((s, i) => [s.toLowerCase(), i]));
 
   for (const item of data.items) {
     if (!item.content) continue;
     if (item.content.__typename === "DraftIssue") continue;
+    if (!item.content.closedAt) continue;
 
-    // Determine if item qualifies based on end condition
-    const endDate = getEndDate(item, endAt, statusIndex);
-    if (!endDate) continue;
-
-    // Determine if item qualifies based on start condition
-    if (startAt !== "created") {
-      if (!hasReachedStatus(item, startAt, statusIndex)) continue;
-    }
-
-    const startDateStr = item.content.createdAt;
-    const startDate = new Date(startDateStr).getTime();
-    const end = new Date(endDate).getTime();
-    const cycleDays = Math.round(((end - startDate) / (1000 * 60 * 60 * 24)) * 10) / 10;
+    const startDate = new Date(item.content.createdAt).getTime();
+    const endDate = new Date(item.content.closedAt).getTime();
+    const cycleDays = Math.round(((endDate - startDate) / (1000 * 60 * 60 * 24)) * 10) / 10;
 
     results.push({
       title: item.content.title,
       number: item.content.number,
       url: item.content.url,
       cycleDays: Math.max(0, cycleDays),
-      startDate: startDateStr,
-      endDate,
+      startDate: item.content.createdAt,
+      endDate: item.content.closedAt,
     });
   }
 
@@ -66,38 +39,6 @@ export function computeCycleTime(
   );
 
   return results;
-}
-
-function getEndDate(
-  item: ProjectItem,
-  endAt: string,
-  statusIndex: Map<string, number>
-): string | null {
-  if (endAt === "closed") {
-    if (!item.content || item.content.__typename === "DraftIssue") return null;
-    return item.content.closedAt;
-  }
-  // Status-based end: item must be at or past the target status
-  if (!hasReachedStatus(item, endAt, statusIndex)) return null;
-  // Use closedAt if available, otherwise updatedAt
-  if (item.content && item.content.__typename !== "DraftIssue" && item.content.closedAt) {
-    return item.content.closedAt;
-  }
-  return item.content?.updatedAt ?? null;
-}
-
-function hasReachedStatus(
-  item: ProjectItem,
-  targetStatus: string,
-  statusIndex: Map<string, number>
-): boolean {
-  if (!item.status) return false;
-  const targetIdx = statusIndex.get(targetStatus.toLowerCase());
-  const currentIdx = statusIndex.get(item.status.toLowerCase());
-  if (targetIdx === undefined || currentIdx === undefined) {
-    return item.status.toLowerCase() === targetStatus.toLowerCase();
-  }
-  return currentIdx >= targetIdx;
 }
 
 export function computeCycleTimeStats(items: CycleTimeItem[]) {

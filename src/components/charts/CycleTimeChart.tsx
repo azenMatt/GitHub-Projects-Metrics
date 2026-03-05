@@ -7,11 +7,9 @@ import ChartContainer from "./ChartContainer";
 interface Props {
   data: CycleTimeItem[];
   stats: { avg: number; median: number; p85: number };
-  startLabel: string;
-  endLabel: string;
 }
 
-export default function CycleTimeChart({ data, stats, startLabel, endLabel }: Props) {
+export default function CycleTimeChart({ data, stats }: Props) {
   const theme = useChartTheme();
 
   if (data.length === 0) {
@@ -96,8 +94,8 @@ export default function CycleTimeChart({ data, stats, startLabel, endLabel }: Pr
               return d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
             };
             return `<b>${p.name}</b><br/>` +
-              `${startLabel}: ${fmtDate(p.startDate)}<br/>` +
-              `${endLabel}: ${fmtDate(p.endDate)}<br/>` +
+              `Created: ${fmtDate(p.startDate)}<br/>` +
+              `Closed: ${fmtDate(p.endDate)}<br/>` +
               `Cycle time: <b>${p.y} days</b><br/>` +
               `<span style="color:var(--text-tertiary);font-size:10px">Click to open issue</span>`;
           },
