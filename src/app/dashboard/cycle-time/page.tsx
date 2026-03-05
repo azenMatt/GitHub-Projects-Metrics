@@ -31,13 +31,18 @@ export default function CycleTimePage() {
   );
 
   const toggleType = (type: string) => {
-    const next = new Set(activeTypes);
-    if (next.has(type)) {
-      next.delete(type);
+    if (allSelected) {
+      // When all selected, clicking one isolates it
+      setSelectedTypes(new Set([type]));
     } else {
-      next.add(type);
+      const next = new Set(activeTypes);
+      if (next.has(type)) {
+        next.delete(type);
+      } else {
+        next.add(type);
+      }
+      setSelectedTypes(next);
     }
-    setSelectedTypes(next);
   };
 
   const allSelected = activeTypes.size === issueTypes.length;
